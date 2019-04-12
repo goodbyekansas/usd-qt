@@ -388,13 +388,30 @@ class RemovePrim(MenuAction):
 
 class SelectVariants(MenuAction):
     @staticmethod
-    def _ApplyVariant(prim, variantSetName, variantValue):
+    def _ApplyVariant(prim, variantSetName, variantValue, context):
         if prim:
+            view = context.outliner.view
             variantSet = prim.GetVariantSet(variantSetName)
             if variantValue == NO_VARIANT_SELECTION:
                 variantSet.ClearVariantSelection()
             else:
+                old_value = variantSet.GetVariantSelection()
+                # before switching capture the state
+                view.PreVariantSelectionChanged.emit(str(prim.GetPath()),
+                                    variantSetName,
+                                    old_value,
+                                    variantValue
+                                    )
                 variantSet.SetVariantSelection(variantValue)
+                # after switching emit as well to be able to do post
+                # post switching stuff.
+                view.PostVariantSelectionChanged.emit(str(prim.GetPath()),
+                                    variantSetName,
+                                    old_value,
+                                    variantValue
+                                    )
+
+
 
     def Build(self, context):
         prims = context.selectedPrims
@@ -417,7 +434,7 @@ class SelectVariants(MenuAction):
                          and currentValue == ''):
                     a.setChecked(True)
                 a.triggered.connect(partial(self._ApplyVariant,
-                                            prim, setName, setValue))
+                                            prim, setName, setValue, context))
         return menu.menuAction()
 
 
@@ -605,7 +622,8 @@ class ShowEditTargetDialog(MenuAction):
 class OutlinerTreeView(ContextMenuMixin, QtWidgets.QTreeView):
     # Emitted with lists of selected and deselected prims
     primSelectionChanged = QtCore.Signal(list, list)
-
+    PreVariantSelectionChanged = QtCore.Signal(str, str, str, str)
+    PostVariantSelectionChanged = QtCore.Signal(str, str, str, str)
     def __init__(self, contextMenuActions, contextProvider=None, parent=None):
         # type: (List[MenuAction], Optional[ContextProvider], Optional[QtWidgets.QWidget]) -> None
         """
