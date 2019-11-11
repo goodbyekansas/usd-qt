@@ -307,7 +307,7 @@ class ActivatePrims(MenuAction):
 
 
 class DeactivatePrims(MenuAction):
-    defaultText = 'Dectivate'
+    defaultText = 'Deactivate'
 
     def Update(self, action, context):
         action.setEnabled(bool(context.selectedPrims))
@@ -317,6 +317,32 @@ class DeactivatePrims(MenuAction):
         with Sdf.ChangeBlock():
             for prim in context.selectedPrims:
                 prim.SetActive(False)
+
+
+class MakeVisible(MenuAction):
+    defaultText = 'Make Visible'
+
+    def Update(self, action, context):
+        action.setEnabled(bool(context.selectedPrims))
+
+    def Do(self):
+        from pxr import UsdGeom
+        context = self.GetCurrentContext()
+        for prim in context.selectedPrims:
+            UsdGeom.Imageable(prim).MakeVisible()
+
+
+class MakeInvisible(MenuAction):
+    defaultText = 'Make Invisible'
+
+    def Update(self, action, context):
+        action.setEnabled(bool(context.selectedPrims))
+
+    def Do(self):
+        from pxr import UsdGeom
+        context = self.GetCurrentContext()
+        for prim in context.selectedPrims:
+            UsdGeom.Imageable(prim).MakeInvisible()
 
 
 class AddTransform(MenuAction):
@@ -619,6 +645,14 @@ class ShowEditTargetDialog(MenuAction):
         context.outliner.ShowEditTargetDialog()
 
 
+class ShowOpinionEditor(MenuAction):
+    defaultText = 'Show Opinion Editor'
+
+    def Do(self):
+        context = self.GetCurrentContext()
+        context.outliner.ShowOpinionEditor(context.selectedPrims)
+
+
 class OutlinerTreeView(ContextMenuMixin, QtWidgets.QTreeView):
     # Emitted with lists of selected and deselected prims
     primSelectionChanged = QtCore.Signal(list, list)
@@ -776,7 +810,7 @@ class OutlinerRole(object):
         List[Union[MenuAction, Type[MenuAction]]]
         """
         return [ActivatePrims, DeactivatePrims, SelectVariants, MenuSeparator,
-                RemovePrim]
+                RemovePrim, MakeVisible, MakeInvisible]
 
     @classmethod
     def GetMenuBarMenuBuilders(cls, outliner):
@@ -793,8 +827,8 @@ class OutlinerRole(object):
         saveState = SaveState(outliner)
         return [MenuBuilder('&File', [SaveEditLayer(saveState)]),
                 MenuBuilder('&Tools', [ShowEditTargetLayerText,
-                                       ShowEditTargetDialog])]
-
+                                       ShowEditTargetDialog,
+                                       ShowOpinionEditor])]
 
 class UsdOutliner(QtWidgets.QWidget):
     """UsdStage editing application which displays the hierarchy of a stage."""
@@ -973,6 +1007,21 @@ class UsdOutliner(QtWidgets.QWidget):
         self.editTargetDialog.show()
         self.editTargetDialog.raise_()
         self.editTargetDialog.activateWindow()
+
+    def ShowOpinionEditor(self, prims=None):
+        from pxr.UsdQt.opinionModel import OpinionStandardModel
+        from pxr.UsdQtEditors.opinionEditor import OpinionDialog
+
+        # only allow one window
+        if not prims:
+            prims = self.view.SelectedPrims()
+
+        dialog = OpinionDialog(prims=prims, parent=self)
+        self.view.primSelectionChanged.connect(
+            dialog.controller.ResetPrims)
+        dialog.show()
+        dialog.raise_()
+        dialog.activateWindow()
 
 
 class UsdOutlinerDialog(QtWidgets.QDialog):
