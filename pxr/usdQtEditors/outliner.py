@@ -31,10 +31,12 @@ from collections import namedtuple
 from functools import partial
 
 from ._Qt import QtCore, QtGui, QtWidgets
+from Qt import QtCompat
 
-from pxr import Sdf, Tf, Usd
-from pxr.UsdQt.hierarchyModel import HierarchyBaseModel
+from pxr import Sdf, Tf, Usd, UsdGeom
+from pxr.UsdQt.hierarchyModel import HierarchyStandardModel
 from pxr.UsdQt.hooks import UsdQtHooks
+from pxr.UsdQt.compatability import HeaderViewSetResizeMode
 from pxr.UsdQt.layerModel import LayerStackBaseModel
 from pxr.UsdQt.qtUtils import DARK_ORANGE, MenuAction, MenuSeparator, \
     MenuBuilder, ContextMenuMixin, MenuBarBuilder, CopyToClipboard
@@ -464,6 +466,27 @@ class SelectVariants(MenuAction):
         return menu.menuAction()
 
 
+class ImportAsNative(MenuAction):
+    @staticmethod
+    def Do(prim, context):
+        if prim:
+            view = context.outliner.view
+            view.ImportAsNativeChanged.emit(str(prim.GetPath()))
+
+    def Build(self, context):
+        prims = context.selectedPrims
+        if len(prims) != 1:
+            return
+        # only do one at time for now.
+        prim = prims[0]
+        if not prim.IsA(UsdGeom.Mesh):
+            return
+        action = QtWidgets.QAction("ImportAsNative", None)
+        self.Update(action, context)
+        action.triggered.connect(partial(self.Do, prim, context))
+        return action
+
+
 class AddReference(MenuAction):
     defaultText = 'Add Reference...'
 
@@ -658,6 +681,8 @@ class OutlinerTreeView(ContextMenuMixin, QtWidgets.QTreeView):
     primSelectionChanged = QtCore.Signal(list, list)
     PreVariantSelectionChanged = QtCore.Signal(str, str, str, str)
     PostVariantSelectionChanged = QtCore.Signal(str, str, str, str)
+    ImportAsNativeChanged = QtCore.Signal(str)
+
     def __init__(self, contextMenuActions, contextProvider=None, parent=None):
         # type: (List[MenuAction], Optional[ContextProvider], Optional[QtWidgets.QWidget]) -> None
         """
@@ -671,14 +696,30 @@ class OutlinerTreeView(ContextMenuMixin, QtWidgets.QTreeView):
             contextMenuActions=contextMenuActions,
             contextProvider=contextProvider,
             parent=parent)
+        
+        self.setDropIndicatorShown(True)
 
         self.setAlternatingRowColors(True)
         self.setSelectionBehavior(self.SelectRows)
         self.setSelectionMode(self.ExtendedSelection)
+        self.setFrameShape(QtWidgets.QFrame.NoFrame)
+        self.setFrameShadow(QtWidgets.QFrame.Plain)
         self.setEditTriggers(self.CurrentChanged | self.SelectedClicked)
-
+        self.setSelectionMode(QtWidgets.QAbstractItemView.ExtendedSelection)
         self.setUniformRowHeights(True)
-        self.header().setStretchLastSection(True)
+        self.setAllColumnsShowFocus(True)
+        self.setUniformRowHeights(True)
+        self.setLineWidth(0)
+        self.setMidLineWidth(0)
+        self.setFocusPolicy(QtCore.Qt.NoFocus)
+        HeaderViewSetResizeMode(self.header(), QtWidgets.QHeaderView.Interactive)
+        self.header().setStretchLastSection(False)
+        self.header().setCascadingSectionResizes(True)
+        self.header().setDefaultSectionSize(150)
+        self.header().setMinimumSectionSize(20)
+        
+
+
 
         self._dataModel = None
 
@@ -809,8 +850,8 @@ class OutlinerRole(object):
         -------
         List[Union[MenuAction, Type[MenuAction]]]
         """
-        return [ActivatePrims, DeactivatePrims, SelectVariants, MenuSeparator,
-                RemovePrim, MakeVisible, MakeInvisible]
+        return [AddTransform, ActivatePrims, DeactivatePrims, ImportAsNative, SelectVariants, MenuSeparator,
+                RemovePrim]
 
     @classmethod
     def GetMenuBarMenuBuilders(cls, outliner):
@@ -848,7 +889,7 @@ class UsdOutliner(QtWidgets.QWidget):
 
         self._stage = None
         self._listener = None
-        self._dataModel = HierarchyBaseModel(stage=stage, parent=self)
+        self._dataModel = HierarchyStandardModel(stage=stage, parent=self)
         self.ResetStage(stage)
 
         if role is None:
@@ -859,9 +900,19 @@ class UsdOutliner(QtWidgets.QWidget):
         view.setColumnWidth(0, 360)
         view.setModel(self._dataModel)
         self.view = view
+        #
+        # make first column stretchable.
+
+        QtCompat.setSectionResizeMode(self.view.header(), 0, QtWidgets.QHeaderView.Stretch)
+        self.view.setColumnWidth(1,56)
+
+        # TODO: add drag and drop for layout
+        #self.view.setDragEnabled(True)
+        #self.view.setAcceptDrops(True)
+        #self.view.setDragDropMode(QtWidgets.QAbstractItemVfindeiew.InternalMove)
 
         delegate = OutlinerViewDelegate(stage, parent=view)
-        view.setItemDelegate(delegate)
+        self.view.setItemDelegate(delegate)
         self.stageChanged.connect(delegate.ResetStage)
 
         self.menuBarBuilder = MenuBarBuilder(

@@ -26,6 +26,7 @@ from __future__ import absolute_import
 
 from ._Qt import QtCore, QtWidgets, QtGui
 from pxr import Sdf, Tf, Usd
+from copy import deepcopy
 
 from ._bindings import PrimFilterCache, _HierarchyCache
 from . import roles, qtUtils
@@ -272,8 +273,10 @@ class HierarchyStandardModel(HierarchyBaseModel):
     Name = "Name"
     Type = "Type"
     Kind = "Kind"
+    Version = "Version"
 
     NormalColor = QtGui.QBrush(QtGui.QColor(227, 227, 227))
+    VariantColor = QtGui.QBrush(QtGui.QColor(79,206,0))
     InactiveDarker = 200
 
     ArcsIconPath = 'icons/arcs_2.xpm'
@@ -298,6 +301,112 @@ class HierarchyStandardModel(HierarchyBaseModel):
                             HierarchyStandardModel.Kind]
         else:
             self.columns = columns
+    
+    def supportedDropActions(self):
+        return QtCore.Qt.MoveAction
+
+    def flags(self, index):
+        defaultFlags = QtCore.QAbstractItemModel.flags(self, index)
+        if index.isValid():
+            return QtCore.Qt.ItemIsDragEnabled | QtCore.Qt.ItemIsDropEnabled | defaultFlags
+        return QtCore.Qt.ItemIsDropEnabled | defaultFlags
+
+    def insertRow(self, row, parentIndex):
+         return self.insertRows(row, 1, parentIndex)
+
+    def insertRows(self, row, count, parentIndex):
+        self.beginInsertRows(parentIndex, row, (row + (count - 1)))
+        self.endInsertRows()
+        return True
+
+    def removeRow(self, row, parentIndex):
+        return self.removeRows(row, 1, parentIndex)
+
+    def removeRows(self, row, count, parentIndex):
+        self.beginRemoveRows(parentIndex, row, row)
+        parentProxy = parentIndex.internalPointer()
+        child = self._index.GetChild(parentProxy, row)
+        self._stage.RemovePrim(child.GetPrim().GetPath())
+        self.endRemoveRows()
+       
+        return True
+
+    # def mimeTypes(self):
+    #    types = QtCore.QStringList() 
+    #    types.append('application/x-qabstractitemmodeldatalist') 
+    #    return types
+
+    def mimeData(self, indices):
+        mimeData = QtCore.QMimeData()
+        usd_paths = ""
+        for index in indices:
+            usd_path = index.internalPointer().GetPrim().GetPath().pathString
+            usd_paths += usd_path + ","
+            #only handle one copy atm.
+            break
+        print usd_paths
+        mimeData.setData('application/x-qabstractitemmodeldatalist', usd_paths)
+        return mimeData
+
+    def dropMimeData(self, mimedata, action, row, column, parentIndex):
+        if action == QtCore.Qt.IgnoreAction:
+            return True
+        
+        if action == QtCore.Qt.CopyAction:
+            print "Copying"
+        elif action == QtCore.Qt.MoveAction:
+            print "Moving"
+
+        encode = mimedata.data('application/x-qabstractitemmodeldatalist')
+
+        data = []
+        item = {}
+        
+        #source_item = QtGui.QStandardItemModel()
+        #source_item.dropMimeData(mimedata, QtCore.Qt.CopyAction, 0,0, QtCore.QModelIndex())
+        #print dir(source_item)
+        #print(source_item.item(0, 0).text()) 
+        
+        # stream = QtCore.QDataStream(encode, QtCore.QIODevice.ReadOnly)
+        # print dir(stream)
+        # while not stream.atEnd():
+        #     r = stream.rea()
+        #     c = stream.readInt32()
+        #     print r, c
+        #     map_items = stream.readInt32()
+        #     for i in range(map_items):
+        #         key = QtCore.Qt.ItemDataRole(stream.readInt32())
+        #         value = ""
+        #         #source_item = QtGui.QStandardItemModel()
+        #         stream >> value
+        #         item[key] = value
+        #     data.append(item)
+        # print data
+
+        # if mimedata.hasText():
+        usd_paths = mimedata.data.split(',')
+        print usd_paths
+        for usd_path in usd_paths:
+            name = usd_path.split('/')[-1]
+            dest_path = parentIndex.internalPointer().GetPrim().GetPath().AppendPath(name)
+            src_path = Sdf.Path(usd_path)
+            print dest_path, "->", src_path
+            Sdf.CopySpec(
+                self._stage.GetCurrentEditTarget(),  src_path,
+                self._stage.GetCurrentEditTarget(), dest_path
+            )
+        if row == -1:
+            row = 0
+        print "drop mimedata at", row, parentIndex.internalPointer().GetPrim().GetPath().pathString
+        self.insertRow(row, parentIndex)
+        self.dataChanged.emit( parentIndex, parentIndex )
+        return False
+
+    #def moveRow(src_parent, src_row, dst_parent, dst_row):
+    #    self.moveRows(src_parent, src_row, 1, dst_parent, dst_row)
+
+    #def moveRows(src_parent, src_row, count, dst_parent, dst_row):
+    #    print src_parent, src_row, count, dst_parent, dst_row
 
     def headerData(self, section, orientation, role):
         if role == QtCore.Qt.DisplayRole:
@@ -315,7 +424,10 @@ class HierarchyStandardModel(HierarchyBaseModel):
         column = self.columns[modelIndex.column()]
         if role == QtCore.Qt.ForegroundRole:
             prim = self._GetPrimForIndex(modelIndex)
-            brush = HierarchyStandardModel.NormalColor
+            if prim.HasVariantSets():
+                brush = HierarchyStandardModel.VariantColor
+            else:
+                brush = HierarchyStandardModel.NormalColor
             if not prim.IsActive():
                 brush = QtGui.QBrush(brush)
                 brush.setColor(brush.color().darker(
