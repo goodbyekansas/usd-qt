@@ -439,30 +439,75 @@ class SelectVariants(MenuAction):
                                     variantValue
                                     )
 
+    @staticmethod
+    def _ApplyVariantBatch(prims, variantSetName, variantValue, context):
+        if prims:
+            with Sdf.ChangeBlock():
+                for prim in prims:
+                    view = context.outliner.view
+                    variantSet = prim.GetVariantSet(variantSetName)
+                    if variantValue == NO_VARIANT_SELECTION:
+                        variantSet.ClearVariantSelection()
+                    else:
+                        old_value = variantSet.GetVariantSelection()
+                        # before switching capture the state
+                        view.PreVariantSelectionChanged.emit(str(prim.GetPath()),
+                                                             variantSetName,
+                                                             old_value,
+                                                             variantValue
+                                                             )
+                        variantSet.SetVariantSelection(variantValue)
+                        # after switching emit as well to be able to do post
+                        # post switching stuff.
+                        view.PostVariantSelectionChanged.emit(str(prim.GetPath()),
+                                                              variantSetName,
+                                                              old_value,
+                                                              variantValue
+                                                              )
+
 
 
     def Build(self, context):
         prims = context.selectedPrims
-        if len(prims) != 1:
-            return
+
         prim = prims[0]
         if not prim.HasVariantSets():
             return
 
-        menu = QtWidgets.QMenu('Variants', context.qtParent)
+        # make all prims selected have the same variantsets and setvalues
+        same_vsets = []
         for setName, currentValue in GetPrimVariants(prim):
-            setMenu = menu.addMenu(setName)
             variantSet = prim.GetVariantSet(setName)
-            for setValue in [NO_VARIANT_SELECTION] + \
-                    variantSet.GetVariantNames():
-                a = setMenu.addAction(setValue)
-                a.setCheckable(True)
-                if setValue == currentValue or \
-                        (setValue == NO_VARIANT_SELECTION
-                         and currentValue == ''):
-                    a.setChecked(True)
-                a.triggered.connect(partial(self._ApplyVariant,
-                                            prim, setName, setValue, context))
+            same_vset = True
+            for _prim in prims:
+                # make sure all prims selected has the same variantsets
+                _variantSet = _prim.GetVariantSet(setName)
+                if _variantSet.GetName() != variantSet.GetName() \
+                    or variantSet.GetVariantNames() != _variantSet.GetVariantNames():
+                    same_vset = False
+            if same_vset:
+                same_vsets.append({"setName":setName,
+                                   "currentValue": currentValue
+                                   })
+
+        if same_vsets:
+            menu = QtWidgets.QMenu('Variants', context.qtParent)
+            for vset in same_vsets:
+                setName = vset.get("setName")
+                variant_set = prim.GetVariantSet(setName)
+                currentValue = vset.get("currentValue")
+                setMenu = menu.addMenu(setName)
+                for setValue in [NO_VARIANT_SELECTION] + \
+                                variant_set.GetVariantNames():
+                    a = setMenu.addAction(setValue)
+                    a.setCheckable(True)
+                    if setValue == currentValue or \
+                            (setValue == NO_VARIANT_SELECTION
+                             and currentValue == ''):
+                        a.setChecked(True)
+                    a.triggered.connect(partial(self._ApplyVariantBatch,
+                                                prims, setName, setValue, context))
+
         return menu.menuAction()
 
 
