@@ -441,31 +441,41 @@ class SelectVariants(MenuAction):
 
     @staticmethod
     def _ApplyVariantBatch(prims, variantSetName, variantValue, context):
+        def itterate_prims(prims):
+            for prim in prims:
+                view = context.outliner.view
+                variantSet = prim.GetVariantSet(variantSetName)
+                if variantValue == NO_VARIANT_SELECTION:
+                    variantSet.ClearVariantSelection()
+                else:
+                    old_value = variantSet.GetVariantSelection()
+                    # before switching capture the state
+                    view.PreVariantSelectionChanged.emit(str(prim.GetPath()),
+                                                        variantSetName,
+                                                        old_value,
+                                                        variantValue
+                                                        )
+                    variantSet.SetVariantSelection(variantValue)
+                    # after switching emit as well to be able to do post
+                    # post switching stuff.
+                    view.PostVariantSelectionChanged.emit(str(prim.GetPath()),
+                                                        variantSetName,
+                                                        old_value,
+                                                        variantValue
+                                                        )
         if prims:
-            with Sdf.ChangeBlock():
+            if (
+                variantSetName == "department"
+                and variantValue == "animation"
+            ) or (
+                variantSetName == "anim_variant"
+                and variantValue != "cache"
+            ):
                 for prim in prims:
-                    view = context.outliner.view
-                    variantSet = prim.GetVariantSet(variantSetName)
-                    if variantValue == NO_VARIANT_SELECTION:
-                        variantSet.ClearVariantSelection()
-                    else:
-                        old_value = variantSet.GetVariantSelection()
-                        # before switching capture the state
-                        view.PreVariantSelectionChanged.emit(str(prim.GetPath()),
-                                                             variantSetName,
-                                                             old_value,
-                                                             variantValue
-                                                             )
-                        variantSet.SetVariantSelection(variantValue)
-                        # after switching emit as well to be able to do post
-                        # post switching stuff.
-                        view.PostVariantSelectionChanged.emit(str(prim.GetPath()),
-                                                              variantSetName,
-                                                              old_value,
-                                                              variantValue
-                                                              )
-
-
+                    itterate_prims(prims)
+            else:
+                with Sdf.ChangeBlock():
+                    itterate_prims(prims)
 
     def Build(self, context):
         prims = context.selectedPrims
