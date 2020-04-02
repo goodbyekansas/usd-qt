@@ -441,7 +441,7 @@ class SelectVariants(MenuAction):
 
     @staticmethod
     def _ApplyVariantBatch(prims, variantSetName, variantValue, context):
-        def itterate_prims(prims):
+        def iterate_prims(prims):
             for prim in prims:
                 view = context.outliner.view
                 variantSet = prim.GetVariantSet(variantSetName)
@@ -471,11 +471,10 @@ class SelectVariants(MenuAction):
                 variantSetName == "anim_variant"
                 and variantValue != "cache"
             ):
-                for prim in prims:
-                    itterate_prims(prims)
+                iterate_prims(prims)
             else:
                 with Sdf.ChangeBlock():
-                    itterate_prims(prims)
+                    iterate_prims(prims)
 
     def Build(self, context):
         prims = context.selectedPrims
