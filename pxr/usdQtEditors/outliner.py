@@ -443,38 +443,64 @@ class SelectVariants(MenuAction):
     def _ApplyVariantBatch(prims, variantSetName, variantValue, context):
         def iterate_prims(prims):
             for prim in prims:
-                view = context.outliner.view
+                SelectVariants._ApplyVariant(prim, variantSetName, variantValue, context)
+
+        def check_valid_variant_switch(prim, variantSetName, variantValue, context, view):
+            if prim:
                 variantSet = prim.GetVariantSet(variantSetName)
                 if variantValue == NO_VARIANT_SELECTION:
                     variantSet.ClearVariantSelection()
-                else:
-                    old_value = variantSet.GetVariantSelection()
-                    # before switching capture the state
-                    view.PreVariantSelectionChanged.emit(str(prim.GetPath()),
-                                                        variantSetName,
-                                                        old_value,
-                                                        variantValue
-                                                        )
-                    variantSet.SetVariantSelection(variantValue)
-                    # after switching emit as well to be able to do post
-                    # post switching stuff.
-                    view.PostVariantSelectionChanged.emit(str(prim.GetPath()),
-                                                        variantSetName,
-                                                        old_value,
-                                                        variantValue
-                                                        )
+                    return False
+                return True
+            return False
+
         if prims:
             if (
                 variantSetName == "department"
                 and variantValue == "animation"
             ) or (
                 variantSetName == "anim_variant"
-                and variantValue != "cache"
-            ):
+                and "cache" not in variantValue):
+                # anim variants needs special treatment
+                # and needs to be outside of a change block.
+                # Especially the mayaReference for multiple characters
+                # does only load the last one if within a changeblock.
                 iterate_prims(prims)
             else:
+                # do pre variant selections edits
+                view = context.outliner.view
+                for prim in prims:
+                    if check_valid_variant_switch(
+                        prim, variantSetName, variantValue, context, view
+                        ):
+                        variantSet = prim.GetVariantSet(variantSetName)
+                        old_value = variantSet.GetVariantSelection()
+                        # before switching capture the state
+                        view.PreVariantSelectionChanged.emit(str(prim.GetPath()),
+                                            variantSetName,
+                                            old_value,
+                                            variantValue
+                                            )
+                # do changeblock for selection
                 with Sdf.ChangeBlock():
-                    iterate_prims(prims)
+                    for prim in prims:
+                        if check_valid_variant_switch(
+                            prim, variantSetName, variantValue, context, view
+                            ):
+                            variantSet = prim.GetVariantSet(variantSetName)
+                            variantSet.SetVariantSelection(variantValue)
+                # do post variant selections edits
+                for prim in prims:
+                    if check_valid_variant_switch(
+                        prim, variantSetName, variantValue, context, view
+                        ):
+                        # after switching emit as well to be able to do post
+                        # post switching stuff.
+                        view.PostVariantSelectionChanged.emit(str(prim.GetPath()),
+                                            variantSetName,
+                                            old_value,
+                                            variantValue
+                                            )
 
     def Build(self, context):
         prims = context.selectedPrims
