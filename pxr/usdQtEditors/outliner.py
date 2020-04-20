@@ -527,23 +527,25 @@ class SelectVariants(MenuAction):
                                    "currentValue": currentValue
                                    })
 
-        if same_vsets:
-            menu = QtWidgets.QMenu('Variants', context.qtParent)
-            for vset in same_vsets:
-                setName = vset.get("setName")
-                variant_set = prim.GetVariantSet(setName)
-                currentValue = vset.get("currentValue")
-                setMenu = menu.addMenu(setName)
-                for setValue in [NO_VARIANT_SELECTION] + \
-                                variant_set.GetVariantNames():
-                    a = setMenu.addAction(setValue)
-                    a.setCheckable(True)
-                    if setValue == currentValue or \
-                            (setValue == NO_VARIANT_SELECTION
-                             and currentValue == ''):
-                        a.setChecked(True)
-                    a.triggered.connect(partial(self._ApplyVariantBatch,
-                                                prims, setName, setValue, context))
+        if not same_vsets:
+            return
+     
+        menu = QtWidgets.QMenu('Variants', context.qtParent)
+        for vset in same_vsets:
+            setName = vset.get("setName")
+            variant_set = prim.GetVariantSet(setName)
+            currentValue = vset.get("currentValue")
+            setMenu = menu.addMenu(setName)
+            for setValue in [NO_VARIANT_SELECTION] + \
+                            variant_set.GetVariantNames():
+                a = setMenu.addAction(setValue)
+                a.setCheckable(True)
+                if setValue == currentValue or \
+                        (setValue == NO_VARIANT_SELECTION
+                            and currentValue == ''):
+                    a.setChecked(True)
+                a.triggered.connect(partial(self._ApplyVariantBatch,
+                                            prims, setName, setValue, context))
 
         return menu.menuAction()
 
@@ -560,7 +562,6 @@ class PushToMaya(MenuAction):
         for prim in prims:
             prim_model_api = ModelAPI(prim)
             if not prim_model_api.IsKind(Kind.Tokens.component):
-                print("One of the selected prims is not of type Component")
                 return
         action = QtWidgets.QAction("Push To Maya", None)
         self.Update(action, context)
@@ -580,7 +581,6 @@ class PushToUsd(MenuAction):
         for prim in prims:
             prim_model_api = ModelAPI(prim)
             if not prim_model_api.IsKind(Kind.Tokens.component):
-                print("One of the selected prims is not of type Component")
                 return
         action = QtWidgets.QAction("Push To Usd", None)
         self.Update(action, context)
