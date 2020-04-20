@@ -33,7 +33,7 @@ from functools import partial
 from ._Qt import QtCore, QtGui, QtWidgets
 from Qt import QtCompat
 
-from pxr import Sdf, Tf, Usd, UsdGeom
+from pxr import Sdf, Tf, Usd, Kind
 from pxr.UsdQt.hierarchyModel import HierarchyStandardModel
 from pxr.UsdQt.hooks import UsdQtHooks
 from pxr.UsdQt.compatability import HeaderViewSetResizeMode
@@ -42,6 +42,8 @@ from pxr.UsdQt.qtUtils import DARK_ORANGE, MenuAction, MenuSeparator, \
     MenuBuilder, ContextMenuMixin, MenuBarBuilder, CopyToClipboard
 from pxr.UsdQt.usdUtils import GetPrimVariants
 from pxr.UsdQtEditors.layerTextEditor import LayerTextEditorDialog
+
+from AL.usd.schemas.maya import ModelAPI
 
 if False:
     from typing import *
@@ -546,24 +548,43 @@ class SelectVariants(MenuAction):
         return menu.menuAction()
 
 
-class ImportAsNative(MenuAction):
+class PushToMaya(MenuAction):
     @staticmethod
-    def Do(prim, context):
-        if prim:
+    def Do(prims, context):
+        if prims:
             view = context.outliner.view
-            view.ImportAsNativeChanged.emit(str(prim.GetPath()))
+            view.ToggleMeshChanged.emit(prims, True)
 
     def Build(self, context):
         prims = context.selectedPrims
-        if len(prims) != 1:
-            return
-        # only do one at time for now.
-        prim = prims[0]
-        if not prim.IsA(UsdGeom.Mesh):
-            return
-        action = QtWidgets.QAction("ImportAsNative", None)
+        for prim in prims:
+            prim_model_api = ModelAPI(prim)
+            if not prim_model_api.IsKind(Kind.Tokens.component):
+                print("One of the selected prims is not of type Component")
+                return
+        action = QtWidgets.QAction("Push To Maya", None)
         self.Update(action, context)
-        action.triggered.connect(partial(self.Do, prim, context))
+        action.triggered.connect(partial(self.Do, prims, context))
+        return action
+
+
+class PushToUsd(MenuAction):
+    @staticmethod
+    def Do(prims, context):
+        if prims:
+            view = context.outliner.view
+            view.ToggleMeshChanged.emit(prims, False)
+
+    def Build(self, context):
+        prims = context.selectedPrims
+        for prim in prims:
+            prim_model_api = ModelAPI(prim)
+            if not prim_model_api.IsKind(Kind.Tokens.component):
+                print("One of the selected prims is not of type Component")
+                return
+        action = QtWidgets.QAction("Push To Usd", None)
+        self.Update(action, context)
+        action.triggered.connect(partial(self.Do, prims, context))
         return action
 
 
@@ -761,7 +782,7 @@ class OutlinerTreeView(ContextMenuMixin, QtWidgets.QTreeView):
     primSelectionChanged = QtCore.Signal(list, list)
     PreVariantSelectionChanged = QtCore.Signal(str, str, str, str)
     PostVariantSelectionChanged = QtCore.Signal(str, str, str, str)
-    ImportAsNativeChanged = QtCore.Signal(str)
+    ToggleMeshChanged = QtCore.Signal(list, bool)
 
     def __init__(self, contextMenuActions, contextProvider=None, parent=None):
         # type: (List[MenuAction], Optional[ContextProvider], Optional[QtWidgets.QWidget]) -> None
@@ -930,7 +951,7 @@ class OutlinerRole(object):
         -------
         List[Union[MenuAction, Type[MenuAction]]]
         """
-        return [AddTransform, ActivatePrims, DeactivatePrims, ImportAsNative, SelectVariants, MenuSeparator,
+        return [AddTransform, ActivatePrims, DeactivatePrims, PushToMaya, PushToUsd, SelectVariants, MenuSeparator,
                 RemovePrim]
 
     @classmethod
