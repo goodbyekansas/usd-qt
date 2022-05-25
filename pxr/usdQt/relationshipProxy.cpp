@@ -27,7 +27,7 @@
 
 PXR_NAMESPACE_OPEN_SCOPE
 
-using boost::adaptors::slice;
+using BOOST_NS::adaptors::slice;
 
 UsdQt_RelationshipProxy::UsdQt_RelationshipProxy(
     const std::vector<UsdRelationship>& rels)
@@ -104,14 +104,6 @@ bool UsdQt_RelationshipProxy::ClearTargets(bool removeSpec) {
     bool success = true;
     for (const auto& relationship : _relationships) {
         success &= relationship.ClearTargets(removeSpec);
-    }
-    return success;
-}
-
-bool UsdQt_RelationshipProxy::BlockTargets() {
-    bool success = true;
-    for (const auto& relationship : _relationships) {
-        success &= relationship.BlockTargets();
     }
     return success;
 }

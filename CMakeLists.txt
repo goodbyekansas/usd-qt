@@ -19,17 +19,24 @@ add_compile_options(-DBUILD_OPTLEVEL_OPT -DBUILD_COMPONENT_SRC_PREFIX="")
 
 option(INSTALL_PURE_PYTHON "Install pure python files. Disable to only install compiled extension" ON)
 
+set(BOOST_SYMBOL_NAMESPACE "boost"
+    CACHE STRING
+    "The symbol namespace used in the Boost build. Defaults to \"boost\"")
+
 include(Private)
 
-set(CMAKE_CXX_STANDARD 14)
+if (NOT DEFINED CMAKE_CXX_STANDARD)
+    set(CMAKE_CXX_STANDARD 14)
+endif()
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 find_package(USD REQUIRED)
 find_package(TBB REQUIRED)
 
-find_package(PythonInterp 2.7 REQUIRED)
-find_package(PythonLibs 2.7 REQUIRED)
+find_package(PythonInterp REQUIRED)
+find_package(PythonLibs REQUIRED)
 
+set(BUILD_SHARED_LIBS ON)
 set(Boost_USE_STATIC_LIBS OFF)
 find_package(Boost COMPONENTS python REQUIRED)
 
