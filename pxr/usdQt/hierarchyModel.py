@@ -344,7 +344,6 @@ class HierarchyStandardModel(HierarchyBaseModel):
             usd_paths += usd_path + ","
             #only handle one copy atm.
             break
-        print usd_paths
         mimeData.setData('application/x-qabstractitemmodeldatalist', usd_paths)
         return mimeData
 
@@ -353,9 +352,9 @@ class HierarchyStandardModel(HierarchyBaseModel):
             return True
         
         if action == QtCore.Qt.CopyAction:
-            print "Copying"
+            print("Copying")
         elif action == QtCore.Qt.MoveAction:
-            print "Moving"
+            print("Moving")
 
         encode = mimedata.data('application/x-qabstractitemmodeldatalist')
 
@@ -385,19 +384,16 @@ class HierarchyStandardModel(HierarchyBaseModel):
 
         # if mimedata.hasText():
         usd_paths = mimedata.data.split(',')
-        print usd_paths
         for usd_path in usd_paths:
             name = usd_path.split('/')[-1]
             dest_path = parentIndex.internalPointer().GetPrim().GetPath().AppendPath(name)
             src_path = Sdf.Path(usd_path)
-            print dest_path, "->", src_path
             Sdf.CopySpec(
                 self._stage.GetCurrentEditTarget(),  src_path,
                 self._stage.GetCurrentEditTarget(), dest_path
             )
         if row == -1:
             row = 0
-        print "drop mimedata at", row, parentIndex.internalPointer().GetPrim().GetPath().pathString
         self.insertRow(row, parentIndex)
         self.dataChanged.emit( parentIndex, parentIndex )
         return False

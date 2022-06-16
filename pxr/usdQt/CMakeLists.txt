@@ -35,12 +35,12 @@ endif()
 _pxr_python_module(usdQt
 	PYTHON_LIBRARY
     LIBRARIES
-        tf
-        sdf
-        vt
-        pcp
-        arch
-        usd
+        ${USD_LIB_PREFIX}tf
+        ${USD_LIB_PREFIX}sdf
+        ${USD_LIB_PREFIX}vt
+        ${USD_LIB_PREFIX}pcp
+        ${USD_LIB_PREFIX}arch
+        ${USD_LIB_PREFIX}usd
         ${Boost_PYTHON_LIBRARY}
         ${PYTHON_LIBRARIES}
 

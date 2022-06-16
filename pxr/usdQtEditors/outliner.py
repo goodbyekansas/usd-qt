@@ -43,7 +43,6 @@ from pxr.UsdQt.qtUtils import DARK_ORANGE, MenuAction, MenuSeparator, \
 from pxr.UsdQt.usdUtils import GetPrimVariants
 from pxr.UsdQtEditors.layerTextEditor import LayerTextEditorDialog
 
-from AL.usd.schemas.maya import ModelAPI
 
 if False:
     from typing import *
@@ -550,42 +549,6 @@ class SelectVariants(MenuAction):
         return menu.menuAction()
 
 
-class PushToMaya(MenuAction):
-    @staticmethod
-    def Do(prims, context):
-        if prims:
-            view = context.outliner.view
-            view.ToggleMeshChanged.emit(prims, True)
-
-    def Build(self, context):
-        prims = context.selectedPrims
-        for prim in prims:
-            prim_model_api = ModelAPI(prim)
-            if not prim_model_api.IsKind(Kind.Tokens.component):
-                return
-        action = QtWidgets.QAction("Push To Maya", None)
-        self.Update(action, context)
-        action.triggered.connect(partial(self.Do, prims, context))
-        return action
-
-
-class PushToUsd(MenuAction):
-    @staticmethod
-    def Do(prims, context):
-        if prims:
-            view = context.outliner.view
-            view.ToggleMeshChanged.emit(prims, False)
-
-    def Build(self, context):
-        prims = context.selectedPrims
-        for prim in prims:
-            prim_model_api = ModelAPI(prim)
-            if not prim_model_api.IsKind(Kind.Tokens.component):
-                return
-        action = QtWidgets.QAction("Push To Usd", None)
-        self.Update(action, context)
-        action.triggered.connect(partial(self.Do, prims, context))
-        return action
 
 
 class AddReference(MenuAction):
@@ -951,7 +914,7 @@ class OutlinerRole(object):
         -------
         List[Union[MenuAction, Type[MenuAction]]]
         """
-        return [AddTransform, ActivatePrims, DeactivatePrims, PushToMaya, PushToUsd, SelectVariants, MenuSeparator,
+        return [AddTransform, ActivatePrims, DeactivatePrims, SelectVariants, MenuSeparator,
                 RemovePrim]
 
     @classmethod
