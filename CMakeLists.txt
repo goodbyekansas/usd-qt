@@ -38,7 +38,11 @@ find_package(PythonLibs REQUIRED)
 
 set(BUILD_SHARED_LIBS ON)
 set(Boost_USE_STATIC_LIBS OFF)
-find_package(Boost COMPONENTS python REQUIRED)
+if (${PYTHON3})
+    find_package(Boost COMPONENTS python36 REQUIRED)
+else()
+    find_package(Boost COMPONENTS python REQUIRED)
+endif()
 
 include_directories(${Boost_INCLUDE_DIRS})
 
